@@ -1,13 +1,23 @@
 const express = require("express");
-const { Resend } = require("resend");
+const nodemailer = require("nodemailer");
 const cors = require("cors");
 require("dotenv").config();
 
 const app = express();
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 app.use(cors({ origin: "*", methods: ["POST", "GET"] }));
 app.use(express.json());
+
+// ── Brevo (Sendinblue) transporter ──────────────────────
+const transporter = nodemailer.createTransport({
+  host: "smtp-relay.brevo.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: process.env.BREVO_LOGIN,
+    pass: process.env.BREVO_SMTP_KEY,
+  },
+});
 
 // ── Health check ────────────────────────────────
 app.get("/", (req, res) => {
@@ -25,9 +35,9 @@ app.post("/api/appointment", async (req, res) => {
   const confirmURL = `${process.env.BACKEND_URL || "http://localhost:5000"}/api/confirm-appointment?name=${encodeURIComponent(name)}&email=${encodeURIComponent(email || "")}&phone=${encodeURIComponent(phone)}&date=${encodeURIComponent(date)}&time=${encodeURIComponent(time)}&service=${encodeURIComponent(service)}`;
 
   try {
-    await resend.emails.send({
-      from: "Backbone Physiotherapy <onboarding@resend.dev>",
-      to: [process.env.RECEIVER_EMAIL],
+    await transporter.sendMail({
+      from: `"Backbone Physiotherapy" <a4963d001@smtp-brevo.com>`,
+      to: process.env.RECEIVER_EMAIL,
       subject: `📅 New Appointment Request — ${name}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden;">
@@ -37,41 +47,20 @@ app.post("/api/appointment", async (req, res) => {
           </div>
           <div style="padding: 28px;">
             <table style="width: 100%; border-collapse: collapse;">
-              <tr style="border-bottom: 1px solid #f0f0f0;">
-                <td style="padding: 12px 0; color: #666; font-size: 13px; width: 40%;">Patient Name</td>
-                <td style="padding: 12px 0; color: #1a3a6b; font-weight: bold; font-size: 14px;">${name}</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #f0f0f0;">
-                <td style="padding: 12px 0; color: #666; font-size: 13px;">Phone</td>
-                <td style="padding: 12px 0; color: #222; font-size: 14px;"><a href="tel:${phone}" style="color: #1a3a6b; font-weight: bold;">${phone}</a></td>
-              </tr>
-              <tr style="border-bottom: 1px solid #f0f0f0;">
-                <td style="padding: 12px 0; color: #666; font-size: 13px;">Email</td>
-                <td style="padding: 12px 0; color: #222; font-size: 14px;">${email || "Not provided"}</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #f0f0f0;">
-                <td style="padding: 12px 0; color: #666; font-size: 13px;">Preferred Date</td>
-                <td style="padding: 12px 0; color: #222; font-size: 14px;">${date}</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #f0f0f0;">
-                <td style="padding: 12px 0; color: #666; font-size: 13px;">Preferred Time</td>
-                <td style="padding: 12px 0; color: #222; font-size: 14px;">${time}</td>
-              </tr>
-              <tr style="border-bottom: 1px solid #f0f0f0;">
-                <td style="padding: 12px 0; color: #666; font-size: 13px;">Service</td>
-                <td style="padding: 12px 0; color: #1a3a6b; font-weight: bold; font-size: 14px;">${service}</td>
-              </tr>
-              <tr>
-                <td style="padding: 12px 0; color: #666; font-size: 13px; vertical-align: top;">Notes</td>
-                <td style="padding: 12px 0; color: #222; font-size: 14px;">${message || "No additional notes"}</td>
-              </tr>
+              <tr style="border-bottom: 1px solid #f0f0f0;"><td style="padding: 12px 0; color: #666; font-size: 13px; width: 40%;">Patient Name</td><td style="padding: 12px 0; color: #1a3a6b; font-weight: bold; font-size: 14px;">${name}</td></tr>
+              <tr style="border-bottom: 1px solid #f0f0f0;"><td style="padding: 12px 0; color: #666; font-size: 13px;">Phone</td><td style="padding: 12px 0; color: #222; font-size: 14px;"><a href="tel:${phone}" style="color: #1a3a6b; font-weight: bold;">${phone}</a></td></tr>
+              <tr style="border-bottom: 1px solid #f0f0f0;"><td style="padding: 12px 0; color: #666; font-size: 13px;">Email</td><td style="padding: 12px 0; color: #222; font-size: 14px;">${email || "Not provided"}</td></tr>
+              <tr style="border-bottom: 1px solid #f0f0f0;"><td style="padding: 12px 0; color: #666; font-size: 13px;">Preferred Date</td><td style="padding: 12px 0; color: #222; font-size: 14px;">${date}</td></tr>
+              <tr style="border-bottom: 1px solid #f0f0f0;"><td style="padding: 12px 0; color: #666; font-size: 13px;">Preferred Time</td><td style="padding: 12px 0; color: #222; font-size: 14px;">${time}</td></tr>
+              <tr style="border-bottom: 1px solid #f0f0f0;"><td style="padding: 12px 0; color: #666; font-size: 13px;">Service</td><td style="padding: 12px 0; color: #1a3a6b; font-weight: bold; font-size: 14px;">${service}</td></tr>
+              <tr><td style="padding: 12px 0; color: #666; font-size: 13px; vertical-align: top;">Notes</td><td style="padding: 12px 0; color: #222; font-size: 14px;">${message || "No additional notes"}</td></tr>
             </table>
           </div>
           ${email ? `
           <div style="padding: 0 28px 28px;">
             <div style="background: #f0f7ff; border-radius: 10px; padding: 20px; text-align: center; border: 2px dashed #1a3a6b;">
               <p style="margin: 0 0 6px; color: #1a3a6b; font-weight: bold; font-size: 15px;">Ready to confirm this appointment?</p>
-              <p style="margin: 0 0 16px; color: #666; font-size: 13px;">Click below to send a confirmation email to the patient.</p>
+              <p style="margin: 0 0 16px; color: #666; font-size: 13px;">Click below to send confirmation email to patient.</p>
               <a href="${confirmURL}" style="display: inline-block; background: #1a3a6b; color: white; padding: 14px 32px; border-radius: 8px; text-decoration: none; font-weight: bold; font-size: 15px;">✅ Confirm Appointment</a>
             </div>
           </div>
@@ -80,8 +69,7 @@ app.post("/api/appointment", async (req, res) => {
             <div style="background: #fff3cd; border-radius: 10px; padding: 16px; border: 1px solid #ffc107;">
               <p style="margin: 0; color: #856404; font-size: 13px;">⚠️ Patient did not provide email — please call <strong>${phone}</strong> to confirm.</p>
             </div>
-          </div>
-          `}
+          </div>`}
           <div style="background: #f8f9fa; padding: 14px 28px; border-top: 1px solid #e0e0e0; text-align: center;">
             <p style="margin: 0; color: #888; font-size: 12px;">Backbone Physiotherapy • Rion's Hospital, Sector 110, Gurugram</p>
           </div>
@@ -101,18 +89,13 @@ app.get("/api/confirm-appointment", async (req, res) => {
   const { name, email, phone, date, time, service } = req.query;
 
   if (!email || !name) {
-    return res.send(`
-      <div style="font-family: Arial; text-align: center; padding: 60px;">
-        <h2 style="color: #e53e3e;">❌ Cannot Confirm</h2>
-        <p>Patient email not available. Please call <strong>${phone}</strong> to confirm.</p>
-      </div>
-    `);
+    return res.send(`<div style="font-family: Arial; text-align: center; padding: 60px;"><h2 style="color: #e53e3e;">❌ Cannot Confirm</h2><p>Patient email not available. Please call <strong>${phone}</strong> to confirm.</p></div>`);
   }
 
   try {
-    await resend.emails.send({
-      from: "Backbone Physiotherapy <onboarding@resend.dev>",
-      to: [email],
+    await transporter.sendMail({
+      from: `"Backbone Physiotherapy" <a4963d001@smtp-brevo.com>`,
+      to: email,
       subject: `✅ Appointment Confirmed — Backbone Physiotherapy`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden;">
@@ -122,9 +105,7 @@ app.get("/api/confirm-appointment", async (req, res) => {
           </div>
           <div style="padding: 32px;">
             <p style="color: #333; font-size: 16px; margin: 0 0 16px;">Dear <strong>${name}</strong>,</p>
-            <p style="color: #555; font-size: 14px; line-height: 1.7; margin: 0 0 24px;">
-              Great news! Your appointment has been <strong style="color: #16a34a;">confirmed</strong> by our team. We look forward to seeing you!
-            </p>
+            <p style="color: #555; font-size: 14px; line-height: 1.7; margin: 0 0 24px;">Your appointment has been <strong style="color: #16a34a;">confirmed</strong> by our team!</p>
             <div style="background: #f0f7f0; border-radius: 10px; padding: 20px; margin: 0 0 24px; border-left: 4px solid #16a34a;">
               <p style="margin: 0 0 12px; font-weight: bold; color: #1a3a6b; font-size: 15px;">📋 Appointment Details</p>
               <table style="width: 100%; border-collapse: collapse;">
@@ -180,9 +161,9 @@ app.post("/api/contact", async (req, res) => {
   }
 
   try {
-    await resend.emails.send({
-      from: "Backbone Physiotherapy <onboarding@resend.dev>",
-      to: [process.env.RECEIVER_EMAIL],
+    await transporter.sendMail({
+      from: `"Backbone Physiotherapy" <a4963d001@smtp-brevo.com>`,
+      to: process.env.RECEIVER_EMAIL,
       subject: `📩 New Contact Message — ${firstName} ${lastName || ""}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 10px; overflow: hidden;">
